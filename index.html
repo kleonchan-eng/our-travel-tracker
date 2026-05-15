@@ -1,0 +1,771 @@
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Our Travel Tracker</title>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp }             from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set, get }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  // ── PASTE YOUR FIREBASE CONFIG HERE ─────────────────────────────────────
+  const firebaseConfig = {
+    apiKey:            "YOUR_API_KEY",
+    authDomain:        "YOUR_PROJECT.firebaseapp.com",
+    databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+    projectId:         "YOUR_PROJECT",
+    storageBucket:     "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId:             "YOUR_APP_ID"
+  };
+  // ────────────────────────────────────────────────────────────────────────
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+  const KEY = "ourTravelTracker";
+
+  // expose to global so the rest of the app can use it
+  window._fbRef     = ref(db, KEY);
+  window._fbOnValue = onValue;
+  window._fbSet     = set;
+  window._fbGet     = get;
+  window._fbReady   = true;
+  document.dispatchEvent(new Event("firebase-ready"));
+</script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#5a7d6b;--green-light:#e8f2ed;--green-mid:#c8dfd4;
+  --border:#ede9e4;--bg:#f7f5f2;--text:#2c2c2a;--muted:#888780;
+  --red:#c0392b;--pink:#d4789a;--gold:#e9a84c;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;min-height:100vh}
+.app{max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+
+/* header */
+.hdr{background:var(--green);padding:18px 16px 14px;color:#fff}
+.hdr-row{display:flex;align-items:center;justify-content:space-between}
+.hdr-title{font-size:19px;font-weight:600;letter-spacing:-.3px}
+.hdr-sub{font-size:12px;opacity:.75;margin-top:1px}
+.hdr-btns{display:flex;align-items:center;gap:8px}
+.sync-badge{font-size:11px;background:rgba(255,255,255,.18);border-radius:20px;padding:3px 10px;display:flex;align-items:center;gap:4px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:#a8e6cf;display:inline-block}
+.icon-btn{background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+
+/* tabs */
+.tabs{display:flex;background:#fff;border-bottom:1px solid var(--border)}
+.tab{flex:1;padding:10px 2px;text-align:center;font-size:11px;font-weight:500;color:var(--muted);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab.active{color:var(--green);border-bottom-color:var(--green)}
+.tab-icon{font-size:15px}
+
+/* content + fab */
+.content{flex:1;padding:16px;padding-bottom:90px;overflow-y:auto}
+.fab{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);width:calc(min(430px,100%) - 32px);background:var(--green);color:#fff;border:none;border-radius:16px;padding:15px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(90,125,107,.4)}
+
+/* cards */
+.card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+.card.no-pad{padding:0 16px}
+.card.green{background:var(--green-light);border-color:var(--green-mid)}
+.sec-lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:16px 0 8px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-box{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px}
+.stat-lbl{font-size:11px;color:var(--muted);margin-bottom:3px}
+.stat-val{font-size:20px;font-weight:700;color:var(--text)}
+
+/* progress bar */
+.bar-wrap{background:var(--border);border-radius:99px;height:5px;margin:7px 0 3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px;transition:width .4s}
+.bar-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+
+/* expense rows */
+.exp-row{display:flex;align-items:flex-start;gap:11px;padding:11px 0;border-bottom:1px solid #f5f2ef}
+.exp-row:last-child{border-bottom:none}
+.exp-icon{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;margin-top:1px}
+.exp-info{flex:1;min-width:0}
+.exp-desc{font-size:14px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-meta{font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.exp-right{display:flex;align-items:flex-start;gap:6px;flex-shrink:0}
+.exp-sgd{font-size:14px;font-weight:600;color:var(--text);text-align:right}
+.exp-orig{font-size:11px;color:var(--muted);text-align:right}
+.del-btn{background:none;border:none;color:#d0ccc7;cursor:pointer;font-size:15px;padding:2px;margin-top:1px}
+.del-btn:hover{color:var(--red)}
+.map-pill{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--green);background:var(--green-light);border:none;border-radius:6px;padding:2px 7px;cursor:pointer;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stars{color:var(--gold);font-size:13px}
+.star-dim{color:#ddd;font-size:13px}
+.review-txt{font-size:12px;color:#5f5e5a;font-style:italic}
+
+/* member avatar */
+.avatar{border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(44,44,42,.5);z-index:300;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:#fff;width:100%;max-width:430px;border-radius:22px 22px 0 0;padding:22px 20px 36px;max-height:92vh;overflow-y:auto}
+.sheet-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.sheet-title{font-size:17px;font-weight:700;color:var(--text)}
+.close-btn{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted)}
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:13px;font-weight:500;color:#5f5e5a;margin-bottom:5px}
+.inp{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:11px;font-size:15px;outline:none;background:#fff;color:var(--text);font-family:inherit;box-sizing:border-box}
+.inp:focus{border-color:var(--green)}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-p{width:100%;background:var(--green);color:#fff;border:none;border-radius:13px;padding:15px;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px}
+.btn-s{width:100%;background:var(--bg);color:#5f5e5a;border:1px solid var(--border);border-radius:13px;padding:13px;font-size:15px;font-weight:500;cursor:pointer;margin-top:8px}
+.cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:6px}
+.cat-btn{border:1.5px solid var(--border);border-radius:11px;padding:8px 4px 6px;text-align:center;cursor:pointer;background:#fff;font-size:11px;color:#5f5e5a}
+.cat-btn.sel{border-color:var(--green);background:var(--green-light);color:#3b6d11}
+.cat-em{font-size:21px;display:block;margin-bottom:2px}
+.payer-wrap{display:flex;flex-wrap:wrap;gap:7px}
+.payer-btn{border:1.5px solid var(--border);border-radius:20px;padding:6px 12px 6px 8px;cursor:pointer;background:#fff;font-size:13px;color:#5f5e5a;display:flex;align-items:center;gap:5px}
+.payer-btn.sel{border-color:var(--green);background:var(--green-light);color:#3b6d11}
+.emoji-grid{background:var(--bg);border-radius:12px;padding:10px;display:flex;flex-wrap:wrap;gap:4px}
+.ep{font-size:24px;cursor:pointer;padding:4px;border-radius:8px;display:inline-block}
+.star-pick{display:flex;gap:8px;font-size:32px;cursor:pointer;margin:4px 0}
+.star-pick span{opacity:.2;color:var(--gold);line-height:1;user-select:none}
+.star-pick span.lit{opacity:1}
+.food-box{background:#fffbf3;border:1px solid #fde8b8;border-radius:12px;padding:14px;margin-bottom:14px}
+.map-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.map-btn{border:1.5px solid var(--border);border-radius:12px;padding:11px 8px;cursor:pointer;background:#fff;display:flex;flex-direction:column;align-items:center;gap:5px}
+.map-btn.sel{border-color:var(--green);background:var(--green-light)}
+.map-em{font-size:24px}
+.map-nm{font-size:12px;font-weight:500;color:#5f5e5a}
+.map-btn.sel .map-nm{color:#3b6d11}
+.notice{background:#fef9f0;border:1px solid #fad98a;border-radius:12px;padding:13px;font-size:13px;color:#854f0b;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.empty{text-align:center;padding:48px 20px;color:#aaa}
+.empty-icon{font-size:44px;margin-bottom:12px}
+.dest-btn{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--green);background:var(--green-light);border:none;border-radius:8px;padding:5px 11px;cursor:pointer;margin-top:10px}
+.edit-btn{background:none;border:none;color:#888;cursor:pointer;font-size:18px;padding:2px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <div class="hdr-row">
+      <div>
+        <div class="hdr-title">🌍 Our Travel Tracker</div>
+        <div class="hdr-sub">Shared · synced live</div>
+      </div>
+      <div class="hdr-btns">
+        <div class="sync-badge"><span class="sync-dot"></span><span id="syncLbl">Connecting…</span></div>
+        <button class="icon-btn" onclick="openModal('settings')">⚙️</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="overview"  onclick="switchTab('overview',this)"><span class="tab-icon">🏠</span>Overview</button>
+    <button class="tab"        data-tab="expenses"  onclick="switchTab('expenses',this)"><span class="tab-icon">🧾</span>Expenses</button>
+    <button class="tab"        data-tab="budget"    onclick="switchTab('budget',this)"><span class="tab-icon">💰</span>Budget</button>
+    <button class="tab"        data-tab="members"   onclick="switchTab('members',this)"><span class="tab-icon">👥</span>Members</button>
+    <button class="tab"        data-tab="trips"     onclick="switchTab('trips',this)"><span class="tab-icon">🗺️</span>Trips</button>
+  </div>
+
+  <div class="content" id="content"></div>
+  <button class="fab" id="fab" onclick="fabAction()">＋ <span id="fabLbl">Add Expense</span></button>
+</div>
+
+<div id="overlay" style="display:none" class="overlay" onclick="overlayClick(event)">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+// ── constants ────────────────────────────────────────────────────────────────
+const CATS=[
+  {id:'food',    label:'Food',      emoji:'🍜',color:'#e9a84c'},
+  {id:'transport',label:'Transport',emoji:'🚌',color:'#5a8fc4'},
+  {id:'stay',    label:'Stay',      emoji:'🏨',color:'#9b72cf'},
+  {id:'activity',label:'Activity',  emoji:'🎡',color:'#5a7d6b'},
+  {id:'shopping',label:'Shopping',  emoji:'🛍️',color:'#d4789a'},
+  {id:'health',  label:'Health',    emoji:'💊',color:'#c0544a'},
+  {id:'drinks',  label:'Drinks',    emoji:'🍹',color:'#e07b54'},
+  {id:'other',   label:'Other',     emoji:'💰',color:'#888780'},
+];
+const CURRENCIES=[
+  {code:'SGD',rate:1,sym:'S$'},{code:'USD',rate:1.35,sym:'$'},
+  {code:'EUR',rate:1.46,sym:'€'},{code:'GBP',rate:1.71,sym:'£'},
+  {code:'JPY',rate:0.009,sym:'¥'},{code:'THB',rate:0.038,sym:'฿'},
+  {code:'MYR',rate:0.31,sym:'RM'},{code:'IDR',rate:0.000083,sym:'Rp'},
+  {code:'AUD',rate:0.87,sym:'A$'},{code:'KRW',rate:0.001,sym:'₩'},
+  {code:'HKD',rate:0.173,sym:'HK$'},{code:'CNY',rate:0.186,sym:'¥'},
+  {code:'INR',rate:0.016,sym:'₹'},{code:'VND',rate:0.000053,sym:'₫'},
+  {code:'PHP',rate:0.024,sym:'₱'},
+];
+const MAP_APPS=[
+  {id:'google',name:'Google Maps',emoji:'🗺️',url:q=>`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`},
+  {id:'apple', name:'Apple Maps', emoji:'🍎',url:q=>`https://maps.apple.com/?q=${encodeURIComponent(q)}`},
+  {id:'naver', name:'Naver Maps', emoji:'🟢',url:q=>`https://map.naver.com/v5/search/${encodeURIComponent(q)}`},
+  {id:'amap',  name:'Amap 高德',  emoji:'📍',url:q=>`https://uri.amap.com/search?keyword=${encodeURIComponent(q)}`},
+  {id:'baidu', name:'Baidu Maps', emoji:'🔵',url:q=>`https://map.baidu.com/search/${encodeURIComponent(q)}`},
+];
+const MEMBER_COLORS=['#e8f2ed','#e6f0fb','#faeeda','#fbeaf0','#faece7','#eeedfe','#eaf3de'];
+const TRIP_EMOJIS  =['✈️','🏖️','🗻','🏙️','🌴','🎒','🚂','🛳️','🌍','🗼','⛩️','🏔️'];
+const MEMBER_EMOJIS=['😀','😎','🤩','🥳','😍','🤗','🧑','👩','👨','🧔','👸','🤴','🦄','🐼','🦊','🐻','🌟','🍀','🎯','🎸'];
+
+// ── state ─────────────────────────────────────────────────────────────────────
+let S = { trips:[], activeTrip:null, members:[] };
+let currentTab   = 'overview';
+let prefMap      = localStorage.getItem('prefMap')||'google';
+let _selCat      = 'food';
+let _selPayer    = null;
+let _selEmoji    = MEMBER_EMOJIS[0];
+let _selTripEmoji= TRIP_EMOJIS[0];
+let _selMapPref  = prefMap;
+let _star        = 0;
+let _editMemberId= null;
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+const toSGD  = (a,c)=> a*(CURRENCIES.find(x=>x.code===c)||CURRENCIES[0]).rate;
+const getCat = id  => CATS.find(c=>c.id===id)||CATS[7];
+const f$     = n   => 'S$'+parseFloat(n).toFixed(2);
+const uid    = p   => p+Date.now()+Math.random().toString(36).slice(2,5);
+const fmtDate= d   => new Date(d+'T00:00:00').toLocaleDateString('en-SG',{weekday:'short',day:'numeric',month:'short'});
+const getTrip= ()  => S.trips.find(t=>t.id===S.activeTrip)||null;
+const getMap = ()  => MAP_APPS.find(m=>m.id===prefMap)||MAP_APPS[0];
+const dayCount=(t) => {
+  if(!t.startDate||!t.endDate) return 1;
+  return Math.max(1,Math.round((new Date(t.endDate)-new Date(t.startDate))/86400000)+1);
+};
+
+function setSyncLabel(txt){ const el=document.getElementById('syncLbl'); if(el)el.textContent=txt; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function barHtml(spent,budget,color){
+  const pct=budget?Math.min(100,(spent/budget)*100):0;
+  const over=budget>0&&spent>budget;
+  return `<div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${over?'var(--red)':color}"></div></div>
+  <div class="bar-lbl"><span>${f$(spent)}</span>${budget?`<span style="color:${over?'var(--red)':'#3b6d11'}">${over?'Over '+f$(spent-budget):'Left '+f$(budget-spent)}</span>`:''}</div>`;
+}
+
+function starsHtml(n){
+  if(!n) return '';
+  return [1,2,3,4,5].map(i=>`<span class="${i<=n?'stars':'star-dim'}">★</span>`).join('');
+}
+
+function mapPillHtml(query){
+  if(!query) return '';
+  const map=getMap();
+  const lbl=query.length>16?query.slice(0,16)+'…':query;
+  const safeQ=esc(query);
+  return `<button class="map-pill" onclick="openMapLink('${safeQ}')">📍${map.emoji} ${esc(lbl)}</button>`;
+}
+
+function openMapLink(q){ window.open(getMap().url(q),'_blank'); }
+
+// ── Firebase sync ─────────────────────────────────────────────────────────────
+function initFirebase(){
+  if(!window._fbReady){ document.addEventListener('firebase-ready',initFirebase,{once:true}); return; }
+  setSyncLabel('Live');
+  window._fbOnValue(window._fbRef, snap=>{
+    const val=snap.val();
+    if(val){ S=val; render(); setSyncLabel('Updated ✓'); setTimeout(()=>setSyncLabel('Live'),2000); }
+  });
+}
+
+async function persist(){
+  setSyncLabel('Saving…');
+  try{
+    await window._fbSet(window._fbRef, JSON.parse(JSON.stringify(S)));
+    setSyncLabel('Saved ✓');
+  }catch(e){
+    console.error(e); setSyncLabel('Error ⚠️');
+  }
+  setTimeout(()=>setSyncLabel('Live'),2000);
+}
+
+// ── render ────────────────────────────────────────────────────────────────────
+function render(){
+  if(currentTab==='overview') renderOverview();
+  else if(currentTab==='expenses') renderExpenses();
+  else if(currentTab==='budget') renderBudget();
+  else if(currentTab==='members') renderMembers();
+  else renderTrips();
+}
+
+function switchTab(tab,el){
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const lbls={overview:'Add Expense',expenses:'Add Expense',budget:'Edit Budget',members:'Add Member',trips:'New Trip'};
+  document.getElementById('fabLbl').textContent=lbls[tab]||'Add';
+  render();
+}
+
+function fabAction(){
+  if(currentTab==='members') openModal('member');
+  else if(currentTab==='trips') openModal('trip');
+  else if(currentTab==='budget') openModal('budget');
+  else{ if(!getTrip()){alert('Create or select a trip first.');return;} openModal('expense'); }
+}
+
+// ── overview ──────────────────────────────────────────────────────────────────
+function renderOverview(){
+  const trip=getTrip();
+  const c=document.getElementById('content');
+  if(!trip){ c.innerHTML=`<div class="notice">ℹ️ No trip selected. Go to <b>Trips</b> to create one.</div>`; return; }
+  const exps=trip.expenses||[];
+  const total=exps.reduce((s,e)=>s+toSGD(e.amount,e.currency),0);
+  const budget=trip.budget||0; const rem=budget-total;
+  const d=dayCount(trip);
+  const catMap={}; exps.forEach(e=>{ const v=toSGD(e.amount,e.currency); catMap[e.cat]=(catMap[e.cat]||0)+v; });
+  const memSpend={}; exps.forEach(e=>{ if(e.payer) memSpend[e.payer]=(memSpend[e.payer]||0)+toSGD(e.amount,e.currency); });
+  const map=getMap();
+
+  let html=`<div class="card green">
+    <div style="font-size:13px;color:#3b6d11;margin-bottom:2px">📍 ${esc(trip.name)}</div>
+    <div style="font-size:26px;font-weight:700;color:var(--text);margin:4px 0">${f$(total)}</div>
+    <div style="font-size:12px;color:var(--green)">total spent${d?` · ${d} day trip`:''}</div>
+    ${trip.destination?`<button class="dest-btn" onclick="openMapLink('${esc(trip.destination)}')">📍${map.emoji} ${esc(trip.destination)}</button>`:''}
+    ${budget>0?barHtml(total,budget,'var(--green)'):''}
+  </div>`;
+
+  html+=`<div class="stat-grid">
+    <div class="stat-box"><div class="stat-lbl">Expenses</div><div class="stat-val">${exps.length}</div></div>
+    <div class="stat-box"><div class="stat-lbl">Daily avg</div><div class="stat-val" style="font-size:17px">${f$(total/Math.max(1,d))}</div></div>
+  </div>`;
+
+  if(Object.keys(catMap).length){
+    html+=`<div class="sec-lbl">By category</div><div class="card">`;
+    Object.entries(catMap).forEach(([k,v])=>{
+      const cat=getCat(k);
+      html+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:18px">${cat.emoji}</span>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>${cat.label}</span><span>${f$(v)}</span></div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${total?(v/total*100):0}%;background:${cat.color}"></div></div>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  if(Object.keys(memSpend).length){
+    html+=`<div class="sec-lbl">Per member</div><div class="card no-pad">`;
+    Object.entries(memSpend).forEach(([mid,amt])=>{
+      const m=S.members.find(x=>x.id===mid); if(!m) return;
+      const shopSpent=exps.filter(e=>e.payer===mid&&e.cat==='shopping').reduce((s,e)=>s+toSGD(e.amount,e.currency),0);
+      const sb=m.shoppingBudget||0;
+      html+=`<div class="exp-row">
+        <div class="avatar" style="width:38px;height:38px;background:${m.color};font-size:20px">${m.emoji}</div>
+        <div class="exp-info">
+          <div class="exp-desc">${esc(m.name)}</div>
+          <div class="exp-meta">${total?((amt/total)*100).toFixed(0):0}% · ${f$(amt)}</div>
+          ${sb?`<div style="margin-top:5px"><div style="font-size:11px;color:var(--pink);margin-bottom:1px">🛍️ Shopping</div>${barHtml(shopSpent,sb,'var(--pink)')}</div>`:''}
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  if(exps.length){
+    html+=`<div class="sec-lbl">Recent</div><div class="card no-pad">`;
+    exps.slice(-4).reverse().forEach(e=>{ html+=expCardHtml(e); });
+    html+=`</div>`;
+  }
+
+  c.innerHTML=html;
+}
+
+// ── expenses ──────────────────────────────────────────────────────────────────
+function renderExpenses(){
+  const trip=getTrip(); const c=document.getElementById('content');
+  if(!trip){ c.innerHTML=`<div class="notice">ℹ️ No trip selected.</div>`; return; }
+  const exps=(trip.expenses||[]).slice().reverse();
+  if(!exps.length){ c.innerHTML=`<div class="empty"><div class="empty-icon">🧾</div><div>No expenses yet</div><div style="font-size:13px;margin-top:4px">Tap + to add</div></div>`; return; }
+  const grouped={};
+  exps.forEach(e=>{ if(!grouped[e.date])grouped[e.date]=[]; grouped[e.date].push(e); });
+  let html='';
+  Object.entries(grouped).forEach(([date,items])=>{
+    const dt=items.reduce((s,e)=>s+toSGD(e.amount,e.currency),0);
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px">
+      <span class="sec-lbl" style="margin:0">${fmtDate(date)}</span>
+      <span style="font-size:12px;color:var(--green);font-weight:500">${f$(dt)}</span>
+    </div><div class="card no-pad">`;
+    items.forEach(e=>{ html+=expCardHtml(e); });
+    html+=`</div>`;
+  });
+  c.innerHTML=html;
+}
+
+function expCardHtml(e){
+  const cat=getCat(e.cat); const cur=CURRENCIES.find(x=>x.code===e.currency)||CURRENCIES[0];
+  const payer=S.members.find(m=>m.id===e.payer);
+  const isFood=e.cat==='food'||e.cat==='drinks';
+  return `<div class="exp-row">
+    <div class="exp-icon" style="background:${cat.color}20">${cat.emoji}</div>
+    <div class="exp-info">
+      <div class="exp-desc">${esc(e.desc||cat.label)}</div>
+      <div class="exp-meta">
+        <span>${cat.label}</span>
+        ${payer?`<span>· ${payer.emoji} ${esc(payer.name)}</span>`:''}
+        ${e.location?mapPillHtml(e.location):''}
+      </div>
+      ${isFood&&e.rating?`<div style="display:flex;align-items:center;gap:5px;margin-top:4px">
+        ${starsHtml(e.rating)}
+        ${e.review?`<span class="review-txt">"${esc(e.review)}"</span>`:''}
+      </div>`:''}
+    </div>
+    <div class="exp-right">
+      <div>
+        <div class="exp-sgd">${f$(toSGD(e.amount,e.currency))}</div>
+        ${e.currency!=='SGD'?`<div class="exp-orig">${cur.sym}${parseFloat(e.amount).toLocaleString()}</div>`:''}
+      </div>
+      <button class="del-btn" onclick="delExp('${e.id}')">🗑</button>
+    </div>
+  </div>`;
+}
+
+// ── budget ────────────────────────────────────────────────────────────────────
+function renderBudget(){
+  const trip=getTrip(); const c=document.getElementById('content');
+  if(!trip){ c.innerHTML=`<div class="notice">ℹ️ No trip selected.</div>`; return; }
+  const exps=trip.expenses||[];
+  const total=exps.reduce((s,e)=>s+toSGD(e.amount,e.currency),0);
+  const budget=trip.budget||0;
+  const catSpend={}; exps.forEach(e=>{ const v=toSGD(e.amount,e.currency); catSpend[e.cat]=(catSpend[e.cat]||0)+v; });
+  const activeCats=CATS.filter(c=>catSpend[c.id]||(trip.catBudgets||{})[c.id]);
+
+  let html=`<div class="sec-lbl">Trip budget</div>
+  <div class="card">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:2px">Total allocated</div>
+    <div style="font-size:26px;font-weight:700;margin-bottom:4px">${budget?f$(budget):'Not set'}</div>
+    ${budget?barHtml(total,budget,'var(--green)'):`<div style="font-size:12px;color:var(--muted)">${f$(total)} spent</div>`}
+    <button class="dest-btn" onclick="openModal('budget')" style="margin-top:10px">✏️ Edit budget</button>
+  </div>`;
+
+  if(activeCats.length){
+    html+=`<div class="sec-lbl">By category</div><div class="card no-pad">`;
+    activeCats.forEach(cat=>{
+      const spent=catSpend[cat.id]||0; const cb=(trip.catBudgets||{})[cat.id]||0;
+      html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f2ef">
+        <span style="font-size:20px;flex-shrink:0">${cat.emoji}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;margin-bottom:2px">${cat.label}</div>
+          ${cb?barHtml(spent,cb,cat.color):`<div style="font-size:12px;color:var(--muted)">${f$(spent)} · no limit</div>`}
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  html+=`<div class="sec-lbl">🛍️ Shopping per member</div><div class="card no-pad">`;
+  if(!S.members.length) html+=`<div style="font-size:13px;color:#aaa;padding:14px 0;text-align:center">Add members to set shopping budgets</div>`;
+  S.members.forEach(m=>{
+    const ss=exps.filter(e=>e.payer===m.id&&e.cat==='shopping').reduce((s,e)=>s+toSGD(e.amount,e.currency),0);
+    const sb=m.shoppingBudget||0;
+    html+=`<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #f5f2ef">
+      <div class="avatar" style="width:40px;height:40px;background:${m.color};font-size:22px">${m.emoji}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:500;margin-bottom:2px">${esc(m.name)}</div>
+        ${sb?barHtml(ss,sb,'var(--pink)'):`<div style="font-size:12px;color:var(--muted)">${f$(ss)} · <button onclick="openMemberBudgetModal('${m.id}')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:12px;padding:0">Set budget</button></div>`}
+      </div>
+    </div>`;
+  });
+  html+=`</div>`;
+  c.innerHTML=html;
+}
+
+// ── members ───────────────────────────────────────────────────────────────────
+function renderMembers(){
+  const c=document.getElementById('content');
+  if(!S.members.length){ c.innerHTML=`<div class="empty"><div class="empty-icon">👥</div><div>No members yet</div><div style="font-size:13px;margin-top:4px">Add your travel buddies!</div></div>`; return; }
+  const trip=getTrip(); const exps=trip?trip.expenses||[]:[];
+  let html='<div class="sec-lbl">Travel crew</div>';
+  S.members.forEach(m=>{
+    const spent=exps.filter(e=>e.payer===m.id).reduce((s,e)=>s+toSGD(e.amount,e.currency),0);
+    const ss=exps.filter(e=>e.payer===m.id&&e.cat==='shopping').reduce((s,e)=>s+toSGD(e.amount,e.currency),0);
+    const cnt=exps.filter(e=>e.payer===m.id).length; const sb=m.shoppingBudget||0;
+    html+=`<div class="card">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:${sb?10:0}px">
+        <div class="avatar" style="width:48px;height:48px;background:${m.color};font-size:26px">${m.emoji}</div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:600">${esc(m.name)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${cnt} expense${cnt!==1?'s':''} · ${f$(spent)} paid</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="edit-btn" onclick="openMemberBudgetModal('${m.id}')">✏️</button>
+          <button class="del-btn" onclick="delMember('${m.id}')">🗑</button>
+        </div>
+      </div>
+      ${sb?`<div style="font-size:11px;color:var(--pink);margin-bottom:3px">🛍️ Shopping budget</div>${barHtml(ss,sb,'var(--pink)')}`:
+      `<div style="font-size:12px;color:#aaa">No shopping budget · <button onclick="openMemberBudgetModal('${m.id}')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:12px;padding:0">Add one</button></div>`}
+    </div>`;
+  });
+  c.innerHTML=html;
+}
+
+// ── trips ─────────────────────────────────────────────────────────────────────
+function renderTrips(){
+  const c=document.getElementById('content');
+  if(!S.trips.length){ c.innerHTML=`<div class="empty"><div class="empty-icon">🗺️</div><div>No trips yet</div><div style="font-size:13px;margin-top:4px">Create your first trip!</div></div>`; return; }
+  const map=getMap();
+  let html='<div class="sec-lbl">Your trips</div>';
+  S.trips.forEach(trip=>{
+    const exps=trip.expenses||[]; const tot=exps.reduce((s,e)=>s+toSGD(e.amount,e.currency),0);
+    const pct=trip.budget?Math.min(100,tot/trip.budget*100):0; const isActive=trip.id===S.activeTrip;
+    html+=`<div class="card" style="cursor:pointer;${isActive?'border-color:var(--green);background:#f4faf7':''}" onclick="selTrip('${trip.id}')">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:600">${trip.emoji||'✈️'} ${esc(trip.name)}
+            ${isActive?'<span style="font-size:11px;background:var(--green);color:#fff;border-radius:6px;padding:2px 8px;margin-left:6px;vertical-align:middle">Active</span>':''}
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${trip.startDate||''}${trip.startDate&&trip.endDate?' → '+trip.endDate:''}</div>
+          <div style="font-size:13px;color:var(--green);margin-top:4px">${exps.length} expenses · ${f$(tot)}${trip.budget?' / '+f$(trip.budget):''}</div>
+          ${trip.destination?`<button class="map-pill" style="margin-top:7px" onclick="event.stopPropagation();openMapLink('${esc(trip.destination)}')">📍${map.emoji} ${esc(trip.destination)}</button>`:''}
+        </div>
+        <button class="del-btn" style="margin-left:8px" onclick="event.stopPropagation();delTrip('${trip.id}')">🗑</button>
+      </div>
+      ${trip.budget?`<div class="bar-wrap" style="margin-top:10px"><div class="bar-fill" style="width:${pct}%;background:${pct>=100?'var(--red)':'var(--green)'}"></div></div>
+      <div class="bar-lbl"><span>${f$(tot)} / ${f$(trip.budget)}</span><span>${pct.toFixed(0)}%</span></div>`:''}
+    </div>`;
+  });
+  c.innerHTML=html;
+}
+
+// ── modals ────────────────────────────────────────────────────────────────────
+function openModal(type){ buildModal(type); document.getElementById('overlay').style.display='flex'; }
+function closeModal(){ document.getElementById('overlay').style.display='none'; }
+function overlayClick(e){ if(e.target.id==='overlay') closeModal(); }
+
+function buildModal(type){
+  const sh=document.getElementById('sheet');
+  if(type==='expense')      sh.innerHTML=expenseModalHtml();
+  else if(type==='member')  sh.innerHTML=memberModalHtml();
+  else if(type==='trip')    sh.innerHTML=tripModalHtml();
+  else if(type==='budget')  sh.innerHTML=budgetModalHtml();
+  else if(type==='settings')sh.innerHTML=settingsModalHtml();
+  _selCat='food'; _selPayer=null; _star=0;
+  if(type==='expense')  highlightCat('food');
+  if(type==='member')   { _selEmoji=MEMBER_EMOJIS[0]; highlightEmoji(_selEmoji,'mEmojiGrid'); }
+  if(type==='trip')     { _selTripEmoji=TRIP_EMOJIS[0]; highlightEmoji(_selTripEmoji,'tEmojiGrid'); }
+  if(type==='settings') highlightMap(prefMap);
+}
+
+function openMemberBudgetModal(id){
+  _editMemberId=id;
+  const m=S.members.find(x=>x.id===id);
+  const sh=document.getElementById('sheet');
+  sh.innerHTML=`<div class="sheet-hdr"><span class="sheet-title">${m.emoji} ${esc(m.name)} — Shopping</span><button class="close-btn" onclick="closeModal()">✕</button></div>
+    <div class="fg"><label>🛍️ Shopping budget (SGD)</label><input class="inp" id="sbVal" type="number" placeholder="e.g. 500" min="0" value="${m.shoppingBudget||''}"></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Tracks this member's shopping expenses against their personal limit.</div>
+    <button class="btn-p" onclick="saveMemberBudget()">Save</button>
+    <button class="btn-s" onclick="closeModal()">Cancel</button>`;
+  document.getElementById('overlay').style.display='flex';
+}
+
+// expense modal
+function expenseModalHtml(){
+  const catBtns=CATS.map(c=>`<button class="cat-btn" id="cat_${c.id}" onclick="selCat('${c.id}')"><span class="cat-em">${c.emoji}</span>${c.label}</button>`).join('');
+  const curOpts=CURRENCIES.map(c=>`<option value="${c.code}">${c.code}</option>`).join('');
+  const payerBtns=S.members.length?S.members.map(m=>`<button class="payer-btn" id="pay_${m.id}" onclick="selPayer('${m.id}')">${m.emoji} ${esc(m.name)}</button>`).join(''):'<span style="font-size:13px;color:#aaa">Add members first</span>';
+  return `<div class="sheet-hdr"><span class="sheet-title">💳 Add Expense</span><button class="close-btn" onclick="closeModal()">✕</button></div>
+    <div class="fg"><label>Category</label><div class="cat-grid">${catBtns}</div></div>
+    <div class="fg-row">
+      <div class="fg"><label>Amount</label><input class="inp" id="eAmt" type="number" placeholder="0.00" min="0" step="0.01"></div>
+      <div class="fg"><label>Currency</label><select class="inp" id="eCur">${curOpts}</select></div>
+    </div>
+    <div class="fg"><label>Description</label><input class="inp" id="eDesc" placeholder="e.g. Hawker centre dinner"></div>
+    <div class="fg"><label>📍 Location (optional)</label><input class="inp" id="eLoc" placeholder="e.g. Maxwell Food Centre"></div>
+    <div id="foodBox" class="food-box">
+      <div style="font-size:13px;font-weight:500;color:#854f0b;margin-bottom:10px">⭐ Food rating</div>
+      <div class="star-pick" id="starPick">
+        ${[1,2,3,4,5].map(i=>`<span data-s="${i}" onclick="setStar(${i})">★</span>`).join('')}
+      </div>
+      <div class="fg" style="margin-top:10px;margin-bottom:0">
+        <label>Review <span style="font-weight:400;color:#aaa;font-size:12px">optional</span></label>
+        <input class="inp" id="eReview" placeholder="e.g. Best laksa!">
+      </div>
+    </div>
+    <div class="fg"><label>Date</label><input class="inp" id="eDate" type="date" value="${new Date().toISOString().split('T')[0]}"></div>
+    <div class="fg"><label>Paid by</label><div class="payer-wrap">${payerBtns}</div></div>
+    <button class="btn-p" onclick="saveExpense()">Add Expense</button>
+    <button class="btn-s" onclick="closeModal()">Cancel</button>`;
+}
+
+function selCat(id){
+  _selCat=id;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('sel'));
+  const el=document.getElementById('cat_'+id); if(el)el.classList.add('sel');
+  const fb=document.getElementById('foodBox');
+  if(fb) fb.style.display=(id==='food'||id==='drinks')?'block':'none';
+}
+function highlightCat(id){ setTimeout(()=>selCat(id),10); }
+
+function selPayer(id){
+  _selPayer=_selPayer===id?null:id;
+  document.querySelectorAll('.payer-btn').forEach(b=>b.classList.remove('sel'));
+  if(_selPayer){ const el=document.getElementById('pay_'+_selPayer); if(el)el.classList.add('sel'); }
+}
+
+function setStar(n){
+  _star=n===_star?0:n;
+  document.querySelectorAll('#starPick span').forEach(s=>s.classList.toggle('lit',parseInt(s.dataset.s)<=_star));
+}
+
+async function saveExpense(){
+  const amt=parseFloat(document.getElementById('eAmt')?.value);
+  if(!amt||amt<=0) return alert('Enter a valid amount.');
+  const trip=getTrip(); if(!trip) return;
+  const isFood=_selCat==='food'||_selCat==='drinks';
+  const exp={
+    id:uid('e'),cat:_selCat||'other',amount:amt,
+    currency:document.getElementById('eCur')?.value||'SGD',
+    desc:(document.getElementById('eDesc')?.value||'').trim(),
+    location:(document.getElementById('eLoc')?.value||'').trim(),
+    date:document.getElementById('eDate')?.value||new Date().toISOString().split('T')[0],
+    payer:_selPayer||null,
+    rating:isFood?_star:null,
+    review:isFood?(document.getElementById('eReview')?.value||'').trim():null
+  };
+  trip.expenses=trip.expenses||[]; trip.expenses.push(exp);
+  await persist(); closeModal(); render();
+}
+
+async function delExp(id){
+  const trip=getTrip(); if(!trip) return;
+  trip.expenses=(trip.expenses||[]).filter(e=>e.id!==id);
+  await persist(); render();
+}
+
+// member modal
+function memberModalHtml(){
+  const emojis=MEMBER_EMOJIS.map(e=>`<span class="ep" data-em="${e}" onclick="pickEmoji('${e}','mEmojiGrid')">${e}</span>`).join('');
+  return `<div class="sheet-hdr"><span class="sheet-title">👥 Add Member</span><button class="close-btn" onclick="closeModal()">✕</button></div>
+    <div class="fg"><label>Name</label><input class="inp" id="mName" placeholder="e.g. Sarah"></div>
+    <div class="fg"><label>Emoji avatar</label><div class="emoji-grid" id="mEmojiGrid">${emojis}</div></div>
+    <div class="fg"><label>🛍️ Shopping budget (SGD) <span style="font-weight:400;color:#aaa;font-size:12px">optional</span></label><input class="inp" id="mShop" type="number" placeholder="e.g. 300" min="0"></div>
+    <button class="btn-p" onclick="saveMember()">Add Member</button>
+    <button class="btn-s" onclick="closeModal()">Cancel</button>`;
+}
+
+function pickEmoji(e,gridId){
+  if(gridId==='mEmojiGrid') _selEmoji=e;
+  else _selTripEmoji=e;
+  highlightEmoji(e,gridId);
+}
+function highlightEmoji(sel,gridId){
+  document.querySelectorAll(`#${gridId} .ep`).forEach(el=>el.style.background=el.dataset.em===sel?'#e8f2ed':'transparent');
+}
+
+async function saveMember(){
+  const name=(document.getElementById('mName')?.value||'').trim();
+  if(!name) return alert('Enter a name.');
+  S.members.push({id:uid('m'),name,emoji:_selEmoji||'😀',color:MEMBER_COLORS[S.members.length%MEMBER_COLORS.length],shoppingBudget:parseFloat(document.getElementById('mShop')?.value)||0});
+  await persist(); closeModal(); render();
+}
+
+async function delMember(id){
+  if(!confirm('Remove this member?')) return;
+  S.members=S.members.filter(m=>m.id!==id);
+  await persist(); render();
+}
+
+async function saveMemberBudget(){
+  const m=S.members.find(x=>x.id===_editMemberId); if(!m) return;
+  m.shoppingBudget=parseFloat(document.getElementById('sbVal')?.value)||0;
+  await persist(); closeModal(); render();
+}
+
+// trip modal
+function tripModalHtml(){
+  const today=new Date().toISOString().split('T')[0];
+  const emojis=TRIP_EMOJIS.map(e=>`<span class="ep" data-em="${e}" onclick="pickEmoji('${e}','tEmojiGrid')">${e}</span>`).join('');
+  return `<div class="sheet-hdr"><span class="sheet-title">🗺️ New Trip</span><button class="close-btn" onclick="closeModal()">✕</button></div>
+    <div class="fg"><label>Trip name</label><input class="inp" id="tName" placeholder="e.g. Bali 2026"></div>
+    <div class="fg"><label>Destination</label><input class="inp" id="tDest" placeholder="e.g. Bali, Indonesia"></div>
+    <div class="fg"><label>Emoji</label><div class="emoji-grid" id="tEmojiGrid">${emojis}</div></div>
+    <div class="fg-row">
+      <div class="fg"><label>Start</label><input class="inp" id="tStart" type="date" value="${today}"></div>
+      <div class="fg"><label>End</label><input class="inp" id="tEnd" type="date" value="${today}"></div>
+    </div>
+    <div class="fg"><label>Total budget (SGD) <span style="font-weight:400;color:#aaa;font-size:12px">optional</span></label><input class="inp" id="tBudget" type="number" placeholder="e.g. 5000" min="0"></div>
+    <button class="btn-p" onclick="saveTrip()">Create Trip</button>
+    <button class="btn-s" onclick="closeModal()">Cancel</button>`;
+}
+
+async function saveTrip(){
+  const name=(document.getElementById('tName')?.value||'').trim();
+  if(!name) return alert('Enter a trip name.');
+  const trip={id:uid('t'),name,destination:(document.getElementById('tDest')?.value||'').trim(),emoji:_selTripEmoji||'✈️',startDate:document.getElementById('tStart')?.value,endDate:document.getElementById('tEnd')?.value,budget:parseFloat(document.getElementById('tBudget')?.value)||0,catBudgets:{},expenses:[]};
+  S.trips.push(trip); S.activeTrip=trip.id;
+  await persist(); closeModal(); switchTab('overview',document.querySelector('.tab[data-tab="overview"]'));
+}
+
+async function selTrip(id){
+  S.activeTrip=id; await persist(); switchTab('overview',document.querySelector('.tab[data-tab="overview"]'));
+}
+
+async function delTrip(id){
+  if(!confirm('Delete this trip and all expenses?')) return;
+  S.trips=S.trips.filter(t=>t.id!==id);
+  if(S.activeTrip===id) S.activeTrip=S.trips[0]?.id||null;
+  await persist(); render();
+}
+
+// budget modal
+function budgetModalHtml(){
+  const trip=getTrip(); if(!trip) return '<div>No active trip.</div>';
+  const catInputs=CATS.map(c=>`
+    <div class="fg-row" style="margin-bottom:10px;align-items:center">
+      <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">${c.emoji}</span><span style="font-size:13px;font-weight:500;color:#5f5e5a">${c.label}</span></div>
+      <input class="inp" id="cb_${c.id}" type="number" placeholder="No limit" min="0" value="${(trip.catBudgets||{})[c.id]||''}">
+    </div>`).join('');
+  return `<div class="sheet-hdr"><span class="sheet-title">💰 Trip Budget</span><button class="close-btn" onclick="closeModal()">✕</button></div>
+    <div class="fg"><label>Total trip budget (SGD)</label><input class="inp" id="bTotal" type="number" placeholder="e.g. 5000" min="0" value="${trip.budget||''}"></div>
+    <div class="fg"><label style="margin-bottom:12px">Category budgets (SGD, optional)</label>${catInputs}</div>
+    <button class="btn-p" onclick="saveBudget()">Save Budget</button>
+    <button class="btn-s" onclick="closeModal()">Cancel</button>`;
+}
+
+async function saveBudget(){
+  const trip=getTrip(); if(!trip) return;
+  trip.budget=parseFloat(document.getElementById('bTotal')?.value)||0;
+  trip.catBudgets={};
+  CATS.forEach(c=>{ const v=parseFloat(document.getElementById('cb_'+c.id)?.value)||0; if(v) trip.catBudgets[c.id]=v; });
+  await persist(); closeModal(); render();
+}
+
+// settings modal
+function settingsModalHtml(){
+  const btns=MAP_APPS.map(m=>`<button class="map-btn${m.id===prefMap?' sel':''}" id="mp_${m.id}" onclick="pickMap('${m.id}')"><span class="map-em">${m.emoji}</span><span class="map-nm">${m.name}</span></button>`).join('');
+  return `<div class="sheet-hdr"><span class="sheet-title">⚙️ Settings</span><button class="close-btn" onclick="closeModal()">✕</button></div>
+    <div class="fg"><label>Preferred map app</label><div class="map-grid">${btns}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">Each person picks their own — saved in your browser.</div></div>
+    <button class="btn-p" onclick="saveSettings()">Save</button>
+    <button class="btn-s" onclick="closeModal()">Cancel</button>`;
+}
+
+function pickMap(id){
+  _selMapPref=id;
+  document.querySelectorAll('.map-btn').forEach(b=>b.classList.remove('sel'));
+  const el=document.getElementById('mp_'+id); if(el)el.classList.add('sel');
+}
+function highlightMap(id){ setTimeout(()=>pickMap(id),10); }
+
+function saveSettings(){
+  prefMap=_selMapPref;
+  localStorage.setItem('prefMap',prefMap);
+  closeModal(); render();
+}
+
+// ── boot ──────────────────────────────────────────────────────────────────────
+initFirebase();
+render();
+</script>
+</body>
+</html>
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
